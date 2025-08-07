@@ -20,6 +20,14 @@
             overflow: hidden;
         }
 
+        /* Mobile specific body styles */
+        @media (max-width: 768px) {
+            body {
+                overflow-x: hidden;
+                width: 100vw;
+            }
+        }
+
         /* Header Bar */
         .header-bar {
             position: fixed;
@@ -82,6 +90,17 @@
 
         .sidebar.collapsed {
             transform: translateX(-100%);
+        }
+
+        /* Hide sidebar completely on mobile by default */
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%) !important;
+            }
+            
+            .sidebar.show {
+                transform: translateX(0) !important;
+            }
         }
 
         /* Mobile Overlay */
@@ -455,6 +474,7 @@
                 width: 85%;
                 max-width: 320px;
                 transform: translateX(-100%);
+                z-index: 1001;
             }
 
             .sidebar.show {
@@ -462,11 +482,16 @@
             }
 
             .sidebar-toggle {
-                display: none;
+                display: none !important;
             }
 
             .main-content {
-                margin-left: 0;
+                margin-left: 0 !important;
+                width: 100%;
+            }
+
+            .main-content.expanded {
+                margin-left: 0 !important;
             }
 
             /* Touch gestures */
@@ -477,6 +502,23 @@
             .main-content {
                 touch-action: pan-x pan-y;
             }
+
+            /* Ensure no white space on mobile */
+            body {
+                overflow-x: hidden;
+            }
+
+            .header-bar {
+                width: 100%;
+            }
+
+            .content-container {
+                padding: 10px;
+                margin: 0;
+                width: 100%;
+                box-sizing: border-box;
+            }
+        }
 
             .header h1 {
                 font-size: 2rem;
@@ -520,6 +562,9 @@
 
             .content-container {
                 padding: 10px;
+                margin: 0;
+                width: 100%;
+                box-sizing: border-box;
             }
         }
 
@@ -999,10 +1044,9 @@
             const toggleIcon = document.getElementById('toggle-icon');
             const mainContent = document.getElementById('main-content');
 
-            sidebar.classList.toggle('collapsed');
-            
             if (window.innerWidth > 768) {
                 // Desktop behavior
+                sidebar.classList.toggle('collapsed');
                 mainContent.classList.toggle('expanded');
                 toggle.classList.toggle('collapsed');
                 
@@ -1012,7 +1056,7 @@
                     toggleIcon.textContent = '◀';
                 }
             } else {
-                // Mobile behavior
+                // Mobile behavior - only toggle show/hide
                 sidebar.classList.toggle('show');
                 overlay.classList.toggle('show');
             }
@@ -2252,11 +2296,21 @@
             window.addEventListener('resize', function() {
                 const sidebar = document.getElementById('sidebar');
                 const overlay = document.getElementById('sidebar-overlay');
+                const mainContent = document.getElementById('main-content');
+                const toggle = document.getElementById('sidebar-toggle');
                 
                 if (window.innerWidth > 768) {
                     // Reset mobile states on desktop
                     sidebar.classList.remove('show');
                     overlay.classList.remove('show');
+                    // Restore desktop sidebar if it wasn't collapsed
+                    if (!sidebar.classList.contains('collapsed')) {
+                        mainContent.classList.remove('expanded');
+                    }
+                } else {
+                    // Ensure mobile layout
+                    sidebar.classList.remove('collapsed');
+                    mainContent.classList.remove('expanded');
                 }
             });
 
