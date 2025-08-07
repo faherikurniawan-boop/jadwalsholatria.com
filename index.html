@@ -993,6 +993,7 @@
         let madinahMarker = null;
         let qiblaLine = null;
         let qiblaArrow = null;
+        let qiblaWatchId = null;
 
         function showError(message) {
             hideAllSections();
@@ -2303,26 +2304,20 @@
             if (!madinahMarker) {
                 madinahMarker = L.marker(madinahLatLng, {title: 'Madinah', icon: L.icon({iconUrl: 'https://cdn-icons-png.flaticon.com/512/684/684908.png', iconSize: [32,32], iconAnchor: [16,32]})}).addTo(qiblaMap).bindPopup('Madinah');
             }
-            // User marker
-            if (userMarker) {
-                qiblaMap.removeLayer(userMarker);
-                userMarker = null;
-            }
-            if (qiblaLine) {
-                qiblaMap.removeLayer(qiblaLine);
-                qiblaLine = null;
-            }
-            if (qiblaArrow) {
-                qiblaMap.removeLayer(qiblaArrow);
-                qiblaArrow = null;
-            }
-            // Get user location
+            // Bersihkan marker/garis user lama
+            if (userMarker) { qiblaMap.removeLayer(userMarker); userMarker = null; }
+            if (qiblaLine) { qiblaMap.removeLayer(qiblaLine); qiblaLine = null; }
+            if (qiblaArrow) { qiblaMap.removeLayer(qiblaArrow); qiblaArrow = null; }
+            // Stop watchPosition sebelumnya jika ada
+            if (qiblaWatchId) { navigator.geolocation.clearWatch(qiblaWatchId); qiblaWatchId = null; }
+            // Pantau posisi user secara real-time
             if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(function(pos) {
+                qiblaWatchId = navigator.geolocation.watchPosition(function(pos) {
                     const userLatLng = [pos.coords.latitude, pos.coords.longitude];
+                    if (userMarker) { qiblaMap.removeLayer(userMarker); }
                     userMarker = L.marker(userLatLng, {title: 'Posisi Anda', icon: L.icon({iconUrl: 'https://cdn-icons-png.flaticon.com/512/149/149060.png', iconSize: [32,32], iconAnchor: [16,32]})}).addTo(qiblaMap).bindPopup('Posisi Anda');
                     qiblaMap.setView(userLatLng, 4);
-                    // Garis arah kiblat
+                    if (qiblaLine) { qiblaMap.removeLayer(qiblaLine); }
                     qiblaLine = L.polyline([userLatLng, kaabahLatLng], {color: 'red', weight: 3, dashArray: '6, 8'}).addTo(qiblaMap);
                     // Info jarak ke Madinah dan arah kiblat
                     const distanceToMadinah = getDistanceFromLatLonInKm(pos.coords.latitude, pos.coords.longitude, madinahLatLng[0], madinahLatLng[1]);
