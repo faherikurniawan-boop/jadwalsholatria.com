@@ -350,6 +350,9 @@
                 <button id="use-ip-location" class="location-btn secondary">
                     🌐 Gunakan Lokasi Berdasarkan IP
                 </button>
+                <button id="manual-location" class="location-btn secondary" style="margin-top: 10px;">
+                    📝 Input Lokasi Manual
+                </button>
             </div>
             <div style="font-size: 0.9rem; color: #666; text-align: center;">
                 <p>• Lokasi GPS lebih akurat untuk jadwal sholat</p>
@@ -363,6 +366,28 @@
         </div>
 
         <div id="error" class="error" style="display: none;"></div>
+
+        <div id="manual-location-form" class="prayer-card" style="display: none;">
+            <div class="date-info">
+                <h2>📝 Input Lokasi Manual</h2>
+                <p>Masukkan nama kota atau koordinat lokasi Anda</p>
+            </div>
+            <div style="text-align: center;">
+                <input type="text" id="city-input" placeholder="Contoh: Jambi, Surabaya, Medan" 
+                       style="width: 100%; max-width: 300px; padding: 12px; border: 2px solid #4a7c59; border-radius: 8px; margin-bottom: 15px; font-size: 1rem;">
+                <div>
+                    <button id="search-city" class="location-btn primary">
+                        🔍 Cari Lokasi
+                    </button>
+                    <button id="cancel-manual" class="location-btn secondary">
+                        ❌ Batal
+                    </button>
+                </div>
+                <p style="font-size: 0.9rem; color: #666; margin-top: 10px;">
+                    Atau masukkan koordinat: "-1.6101, 103.6131" (Jambi)
+                </p>
+            </div>
+        </div>
 
         <div id="prayer-content" style="display: none;">
             <div class="prayer-card">
@@ -462,7 +487,14 @@
             document.getElementById('loading').style.display = 'none';
             document.getElementById('error').style.display = 'none';
             document.getElementById('location-permission').style.display = 'none';
+            document.getElementById('manual-location-form').style.display = 'none';
             document.getElementById('prayer-content').style.display = 'none';
+        }
+
+        function showManualLocationForm() {
+            hideAllSections();
+            document.getElementById('manual-location-form').style.display = 'block';
+            document.getElementById('city-input').focus();
         }
 
         function formatTime(timeString) {
@@ -800,76 +832,51 @@
             let errorMessage = '';
             switch(error.code) {
                 case error.PERMISSION_DENIED:
-                    errorMessage = 'Akses lokasi ditolak. Silakan pilih metode lokasi lain.';
+                    errorMessage = 'Akses lokasi GPS ditolak. Mencoba lokasi berdasarkan IP...';
                     break;
                 case error.POSITION_UNAVAILABLE:
-                    errorMessage = 'Informasi lokasi tidak tersedia. Mencoba lokasi berdasarkan IP...';
+                    errorMessage = 'GPS tidak tersedia. Mencoba lokasi berdasarkan IP...';
                     break;
                 case error.TIMEOUT:
-                    errorMessage = 'Waktu permintaan lokasi habis. Mencoba lokasi berdasarkan IP...';
+                    errorMessage = 'GPS timeout. Mencoba lokasi berdasarkan IP...';
                     break;
                 default:
-                    errorMessage = 'Terjadi kesalahan saat mengambil lokasi.';
+                    errorMessage = 'GPS error. Mencoba lokasi berdasarkan IP...';
                     break;
             }
 
-            if (error.code === error.PERMISSION_DENIED) {
-                showError(errorMessage);
+            console.log('GPS Error:', error.code, error.message);
+            
+            // Always try IP location as fallback instead of showing error
+            try {
+                showLoading('GPS gagal, mencoba lokasi berdasarkan IP...');
+                const locationInfo = await getLocationFromIP();
+                console.log('Fallback to IP location:', locationInfo);
+                fetchPrayerTimes(locationInfo.latitude, locationInfo.longitude, locationInfo);
+            } catch (ipError) {
+                console.error('IP location also failed:', ipError);
+                // Only show error if both GPS and IP fail
+                showError('Tidak dapat mendeteksi lokasi Anda. Silakan pilih metode lokasi lain.');
                 setTimeout(showLocationPermission, 2000);
-            } else {
-                // Try IP location as fallback for other errors
-                try {
-                    const locationInfo = await getLocationFromIP();
-                    fetchPrayerTimes(locationInfo.latitude, locationInfo.longitude, locationInfo);
-                } catch (ipError) {
-                    // Final fallback to Jakarta
-                    showError('Gagal mendeteksi lokasi. Menggunakan Jakarta sebagai default.');
-                    setTimeout(() => {
-                        fetchPrayerTimes(-6.2088, 106.8456, { 
-                            source: 'Default', 
-                            locationName: 'Jakarta, Indonesia' 
-                        });
-                    }, 2000);
-                }
             }
         }
 
         async function useIPLocation() {
             try {
                 const locationInfo = await getLocationFromIP();
+                console.log('IP Location detected:', locationInfo);
                 fetchPrayerTimes(locationInfo.latitude, locationInfo.longitude, locationInfo);
             } catch (error) {
-                showError('Gagal mendeteksi lokasi berdasarkan IP. Menggunakan Jakarta sebagai default.');
-                setTimeout(() => {
-                    fetchPrayerTimes(-6.2088, 106.8456, { 
-                        source: 'Default', 
-                        locationName: 'Jakarta, Indonesia' 
-                    });
-                }, 2000);
+                console.error('IP location failed:', error);
+                showError('Gagal mendeteksi lokasi berdasarkan IP. Silakan coba lagi atau gunakan GPS.');
+                setTimeout(showLocationPermission, 2000);
             }
         }
 
         function checkLocationPermission() {
-            // Check if geolocation permission was previously granted
-            if ('permissions' in navigator) {
-                navigator.permissions.query({name: 'geolocation'}).then(function(result) {
-                    if (result.state === 'granted') {
-                        // Permission already granted, get location directly
-                        requestGPSLocation();
-                    } else if (result.state === 'denied') {
-                        // Permission denied, show options
-                        showLocationPermission();
-                    } else {
-                        // Permission prompt, show permission request
-                        showLocationPermission();
-                    }
-                }).catch(() => {
-                    // Fallback if permissions API not supported
-                    showLocationPermission();
-                });
-            } else {
-                showLocationPermission();
-            }
+            // Always show location permission dialog to give user choice
+            // This ensures we don't accidentally default to Jakarta
+            showLocationPermission();
         }
 
         function getNextPrayer() {
@@ -1037,11 +1044,98 @@
             countdownInterval = setInterval(updateCountdown, 1000);
         }
 
+        async function searchCityLocation() {
+            const cityInput = document.getElementById('city-input').value.trim();
+            if (!cityInput) {
+                alert('Silakan masukkan nama kota atau koordinat');
+                return;
+            }
+
+            try {
+                showLoading('Mencari lokasi: ' + cityInput);
+
+                // Check if input is coordinates (lat, lon)
+                const coordMatch = cityInput.match(/^(-?\d+\.?\d*),\s*(-?\d+\.?\d*)$/);
+                if (coordMatch) {
+                    const lat = parseFloat(coordMatch[1]);
+                    const lon = parseFloat(coordMatch[2]);
+                    
+                    if (!isNaN(lat) && !isNaN(lon) && lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180) {
+                        const locationName = await getLocationName(lat, lon);
+                        fetchPrayerTimes(lat, lon, { 
+                            source: 'Manual', 
+                            locationName: locationName 
+                        });
+                        return;
+                    }
+                }
+
+                // Search for city using Nominatim
+                const searchUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(cityInput)}&countrycodes=id&limit=5&addressdetails=1&accept-language=id,en`;
+                
+                const response = await fetch(searchUrl, {
+                    headers: {
+                        'User-Agent': 'JadwalSholatRia/1.0'
+                    }
+                });
+
+                if (response.ok) {
+                    const results = await response.json();
+                    
+                    if (results.length > 0) {
+                        const location = results[0];
+                        const lat = parseFloat(location.lat);
+                        const lon = parseFloat(location.lon);
+                        
+                        let locationName = location.display_name;
+                        if (location.address) {
+                            const addr = location.address;
+                            const city = addr.city || addr.town || addr.village || addr.municipality;
+                            const state = addr.state || addr.province;
+                            const country = addr.country;
+                            
+                            if (city && state) {
+                                locationName = `${city}, ${state}, ${country}`;
+                            } else if (city) {
+                                locationName = `${city}, ${country}`;
+                            }
+                        }
+                        
+                        console.log('Manual location found:', { lat, lon, locationName });
+                        fetchPrayerTimes(lat, lon, { 
+                            source: 'Manual', 
+                            locationName: locationName 
+                        });
+                    } else {
+                        showError('Lokasi tidak ditemukan. Silakan coba nama kota lain atau gunakan koordinat.');
+                        setTimeout(showManualLocationForm, 2000);
+                    }
+                } else {
+                    throw new Error('Gagal mencari lokasi');
+                }
+
+            } catch (error) {
+                console.error('Manual location search failed:', error);
+                showError('Gagal mencari lokasi. Silakan coba lagi atau gunakan metode lain.');
+                setTimeout(showManualLocationForm, 2000);
+            }
+        }
+
         // Event listeners
         document.addEventListener('DOMContentLoaded', function() {
             // Set up button event listeners
             document.getElementById('allow-location').addEventListener('click', requestGPSLocation);
             document.getElementById('use-ip-location').addEventListener('click', useIPLocation);
+            document.getElementById('manual-location').addEventListener('click', showManualLocationForm);
+            document.getElementById('search-city').addEventListener('click', searchCityLocation);
+            document.getElementById('cancel-manual').addEventListener('click', showLocationPermission);
+            
+            // Allow Enter key in city input
+            document.getElementById('city-input').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    searchCityLocation();
+                }
+            });
             
             // Start the location detection process
             checkLocationPermission();
