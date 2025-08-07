@@ -982,6 +982,8 @@
         let tomorrowPrayerTimes = {};
         let countdownInterval = null;
         let indonesianCities = [];
+        let lastPlayedPrayer = null;
+        let adzanAudio = null;
 
         function showError(message) {
             hideAllSections();
@@ -1659,11 +1661,36 @@
                 if (seconds === 0) {
                     highlightCurrentPrayer();
                 }
+
+                // Cek apakah waktu sholat baru saja masuk
+                const currentPrayer = getCurrentPrayer();
+                if (currentPrayer && lastPlayedPrayer !== currentPrayer.name) {
+                    playAdzan(currentPrayer.name);
+                    lastPlayedPrayer = currentPrayer.name;
+                }
             }
 
             // Update immediately and then every second
             updateCountdown();
             countdownInterval = setInterval(updateCountdown, 1000);
+        }
+
+        function playAdzan(prayerName) {
+            // Hentikan audio sebelumnya jika masih berjalan
+            if (adzanAudio) {
+                adzanAudio.pause();
+                adzanAudio.currentTime = 0;
+            }
+            let audioUrl = '';
+            if (prayerName === 'Subuh') {
+                // Adzan Subuh Mekah
+                audioUrl = 'https://archive.org/download/AdzanSubuh/Adzan%20Subuh%20-%20Mekkah.mp3';
+            } else {
+                // Adzan Mekah umum
+                audioUrl = 'https://archive.org/download/AdzanMekkah/Adzan%20Mekkah.mp3';
+            }
+            adzanAudio = new Audio(audioUrl);
+            adzanAudio.play();
         }
 
         async function loadIndonesianCities() {
